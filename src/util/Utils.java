@@ -2,11 +2,14 @@ package util;
 
 public class Utils {
 	public static String getFileName(String path) {
+		if (path == null || path.length() == 0) {
+			return null;
+		}
 		int index = path.lastIndexOf("/");
-		return path.substring(index+1);
+		return path.substring(index + 1);
 	}
 	
-	public static String convertByte(long byteData){
+	public static String formatByte(long byteData){
 		String result = byteData + " B";
 		double temp;
 		if (byteData >= 1024) {
@@ -20,7 +23,7 @@ public class Utils {
 		return result;
 	}
 	
-	public static String convertTime(int second) {
+	public static String formatTime(int second) {
 		String result = second + "秒";
 		int m;
 		int h;

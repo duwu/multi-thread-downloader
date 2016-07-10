@@ -1,45 +1,43 @@
 package task;
 
-import java.util.List;
-
-import core.DownloadListener;
+import core.Downloader;
 import model.CompleteInfo;
 import model.ProgressInfo;
+import util.Utils;
 
-public class CalculateTask implements Runnable {
+/**
+ * 统计下载进度信息的线程
+ * @author zj
+ *
+ */
+public class ProgressTask extends Thread {
+	private Downloader downloader;
 	private long lastTimeBytes = 0; 
-	private DownloadListener listener; //下载过程的监听者
 	private long totalBytes;
-	private List<DownloadTask> taskList;
 	private long startTime; 
-	private boolean running;
 	
-	public CalculateTask(DownloadListener listener, List<DownloadTask> taskList, long totalBytes, long startTime) {
-		this.listener = listener;
+	public ProgressTask(Downloader downloader, long totalBytes, long startTime) {
+		this.downloader = downloader;
 		this.totalBytes = totalBytes;
-		this.taskList = taskList;
 		this.startTime = startTime;
-		this.running = true;
-	}
-
-	public void stop() {
-		this.running = false;
+		this.setDaemon(true);
 	}
 
 	@Override
 	public void run() {
-		while (running) {
+		while (!downloader.isCanceled()) {
 			long currentBytes = 0;
 			
 			//判断所有下载线程是否都已完成
 			boolean finished = true;
-			for (DownloadTask task : taskList) {
+			for (DownloadTask task : downloader.getTaskList()) {
 				if (!task.isFinished()) {
 					finished = false;
 				}
 				currentBytes += task.getDownloadedBytes();
+				System.out.println("线程【" + task.getTaskId() + "】已下载 : " + Utils.formatByte(task.getDownloadedBytes()));
 			}
-		
+			System.out.println("=====================================");
 			int progress = (int) (currentBytes * 100 / totalBytes);
 			long speed = (currentBytes - lastTimeBytes);
 			
@@ -58,7 +56,7 @@ public class CalculateTask implements Runnable {
 			}
 			progressInfo.setProgress(progress);
 			progressInfo.setSpeed(speed);
-			this.listener.onProgress(progressInfo);
+			this.downloader.getListener().onProgress(progressInfo);
 			
 			// 如果下载完成，退出循环
 			if (finished) {
@@ -68,7 +66,7 @@ public class CalculateTask implements Runnable {
 				completeInfo.setFinishTime(System.currentTimeMillis());
 				completeInfo.setCost((int)((completeInfo.getFinishTime() - startTime) / 1000));
 				completeInfo.setSpeed(totalBytes / completeInfo.getCost());
-				listener.onSuccess(completeInfo);
+				this.downloader.getListener().onSuccess(completeInfo);
 				break;
 			}
 			

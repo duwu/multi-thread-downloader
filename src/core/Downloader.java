@@ -7,7 +7,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
-import task.CalculateTask;
+import task.ProgressTask;
 import task.DownloadTask;
 import util.Utils;
 
@@ -23,7 +23,8 @@ public class Downloader {
 	private int threadNum; //开启的线程数目
 	private DownloadListener listener; //下载过程的监听者
 	private List<DownloadTask> taskList; //下载任务类列表
-	private CalculateTask calculateTask; //统计下载进度的任务
+	private ProgressTask progressTask; //统计下载进度的任务
+	private boolean canceled; //取消下载的标记
 	
 	/**
 	 * 创建下载器类
@@ -53,6 +54,7 @@ public class Downloader {
 			con.setRequestMethod("GET"); //设置请求方法为get
 			if (con.getResponseCode() == 200) { //如果请求成功
 				long totalBytes = con.getContentLengthLong(); //获取资源总字节数
+				System.out.println("文件总字节数：" + totalBytes);
 				String filePath = this.saveDir + Utils.getFileName(this.url);
 				File file = new File(filePath); //文件保存完整路径
 				
@@ -61,16 +63,21 @@ public class Downloader {
 				accessFile.setLength(totalBytes);
 				accessFile.close();
 				//计算每个线程的下载字节数
-				long block = (totalBytes % threadNum) == 0 ? (totalBytes / threadNum) : (totalBytes / threadNum) + 1;
+				long blockSize = (totalBytes % threadNum) == 0 ? (totalBytes / threadNum) : (totalBytes / threadNum) + 1;
 				//启动各个下载线程
 				for (int i = 0; i < threadNum; i++) {
-					DownloadTask task = new DownloadTask(i, block, url, file, this);
+					long startByte = i * blockSize;
+					long endByte = (i + 1) * blockSize - 1;
+					if (i == threadNum - 1) {
+						endByte = Math.min(endByte, totalBytes - 1);
+					}
+					DownloadTask task = new DownloadTask(i, url, startByte, endByte, file, this);
 					taskList.add(task);
-					new Thread(task).start();
+					task.start();
 				}
 				//启动统计计算线程
-				calculateTask = new CalculateTask(listener, taskList, totalBytes, System.currentTimeMillis());
-				new Thread(calculateTask).start();
+				progressTask = new ProgressTask(this, totalBytes, System.currentTimeMillis());
+				progressTask.start();
 				
 			} else { //url地址无法访问
 				listener.onError("url地址[" + this.url + "]无法访问！");
@@ -86,12 +93,7 @@ public class Downloader {
 	 * @param e
 	 */
 	public void exception(Exception e) {
-		for (DownloadTask task : this.taskList) {
-			task.setCanceled(true);
-		}
-		if (calculateTask != null) {
-			calculateTask.stop();
-		}
+		cancelAndWaitAllTaskCanceled();
 		listener.onError(e.getMessage());
 	}
 	
@@ -99,14 +101,44 @@ public class Downloader {
 	 * 取消下载
 	 */
 	public void cancel() {
-		for (DownloadTask task : this.taskList) {
-			task.setCanceled(true);
-		}
-		if (calculateTask != null) {
-			calculateTask.stop();
-		}
+		cancelAndWaitAllTaskCanceled();
 		listener.onCancel();
 	}
+	
+	/**
+	 * 取消统计线程和所有下载线程并阻塞至全部已取消
+	 */
+	private void cancelAndWaitAllTaskCanceled() {
+		this.canceled = true;
+		for (DownloadTask task : taskList) {
+			try {
+				task.join();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		}
+		if (this.progressTask != null) {
+			try {
+				this.progressTask.join();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+	
+	public DownloadListener getListener() {
+		return listener;
+	}
+
+	public List<DownloadTask> getTaskList() {
+		return taskList;
+	}
+
+	public boolean isCanceled() {
+		return canceled;
+	}
+	
+	
 
 }
 

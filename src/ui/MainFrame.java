@@ -46,18 +46,18 @@ public class MainFrame extends JFrame implements ActionListener, DownloadListene
 	@Override
 	public synchronized void onProgress(ProgressInfo progressInfo) {
 		StringBuilder msg = new StringBuilder(100);
-		msg.append("总大小：").append(Utils.convertByte(progressInfo.getTotalBytes()));
-		msg.append("\n").append("已下载：").append(Utils.convertByte(progressInfo.getDownloadedBytes()));
+		msg.append("总大小：").append(Utils.formatByte(progressInfo.getTotalBytes()));
+		msg.append("\n").append("已下载：").append(Utils.formatByte(progressInfo.getDownloadedBytes()));
 		msg.append("    已完成：").append(progressInfo.getProgress()).append("%\n");
-		msg.append("下载速度：").append(Utils.convertByte(progressInfo.getSpeed())).append("/s\n");
+		msg.append("下载速度：").append(Utils.formatByte(progressInfo.getSpeed())).append("/s\n");
 		msg.append("已用时间：");
-		msg.append(Utils.convertTime(progressInfo.getCostSeconds()));
+		msg.append(Utils.formatTime(progressInfo.getCostSeconds()));
 		msg.append("\n");
 		msg.append("剩余时间：");
 		if (progressInfo.getRemainingSeconds() == -1) {
 			msg.append("未知");
 		} else {
-			msg.append(Utils.convertTime(progressInfo.getRemainingSeconds()));
+			msg.append(Utils.formatTime(progressInfo.getRemainingSeconds()));
 		}
 		msg.append("\n");
 		infoArea.setText(msg.toString());
@@ -79,9 +79,9 @@ public class MainFrame extends JFrame implements ActionListener, DownloadListene
 	public synchronized void onSuccess(CompleteInfo completeInfo) {
 		StringBuilder msg = new StringBuilder(100);
 		msg.append("下载完成！\n");
-		msg.append("总大小：").append(Utils.convertByte(completeInfo.getBytes())).append("\n");
-		msg.append("总耗时：").append(Utils.convertTime(completeInfo.getCost())).append("\n");
-		msg.append("平均下载速度：").append(Utils.convertByte(completeInfo.getSpeed())).append("/s\n");
+		msg.append("总大小：").append(Utils.formatByte(completeInfo.getBytes())).append("\n");
+		msg.append("总耗时：").append(Utils.formatTime(completeInfo.getCost())).append("\n");
+		msg.append("平均下载速度：").append(Utils.formatByte(completeInfo.getSpeed())).append("/s\n");
 		infoArea.setText("");
 		infoArea.append(msg.toString());
 		startButton.setEnabled(true);
