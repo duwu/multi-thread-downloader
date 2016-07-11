@@ -83,26 +83,39 @@ public class Downloader {
 				listener.onError("url地址[" + this.url + "]无法访问！");
 			}
 		} catch (Exception e) {
-			listener.onError(e.getMessage());
 			e.printStackTrace();
+			listener.onError(e.getMessage());
 		}
 	}
 	
 	/**
 	 * 任何一个DownloadTask执行过程出错，都将调用此方法通知Downloader结束其他的DownloadTask
+	 * 这里必须开一个线程去执行，因为这个方法可能被下载线程调用，如果在下载线程中去执行则肯定会发生死锁
+	 * 因为会出现这种情况：出错的下载线程等待全部下载线程（包括它自己）结束然后再接着往下执行
 	 * @param e
 	 */
-	public void exception(Exception e) {
-		cancelAndWaitAllTaskCanceled();
-		listener.onError(e.getMessage());
+	public void exception(final Exception e) {
+		(new Thread() {
+			@Override
+			public void run() {
+				cancelAndWaitAllTaskCanceled();
+				listener.onError(e.getMessage());
+			}
+		}).start();
 	}
 	
 	/**
-	 * 取消下载
+	 * 取消下载，如果在下载线程或者进度线程中都不调用这个方法，此处可以不一个线程去执行，
+	 * 否则，就必须要
 	 */
 	public void cancel() {
-		cancelAndWaitAllTaskCanceled();
-		listener.onCancel();
+		(new Thread() {
+			@Override
+			public void run() {
+				cancelAndWaitAllTaskCanceled();
+				listener.onCancel();
+			}
+		}).start();
 	}
 	
 	/**

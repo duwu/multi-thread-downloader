@@ -66,11 +66,9 @@ public class MainFrame extends JFrame implements ActionListener, DownloadListene
 
 	@Override
 	public synchronized void onError(String errorMsg) {
-		infoArea.setText("下载失败！");
-		infoArea.append("\n\n");
-		infoArea.append("错误信息：\n");
 		infoArea.append("--------------------------------\n");
-		infoArea.append(errorMsg);
+		infoArea.append("下载失败！错误信息：\n");
+		infoArea.append(errorMsg + "\n");
 		startButton.setEnabled(true);
 		this.downloader = null;
 	}

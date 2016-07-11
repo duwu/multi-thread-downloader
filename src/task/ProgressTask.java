@@ -1,9 +1,11 @@
 package task;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import core.Downloader;
 import model.CompleteInfo;
 import model.ProgressInfo;
-import util.Utils;
 
 /**
  * 统计下载进度信息的线程
@@ -15,6 +17,11 @@ public class ProgressTask extends Thread {
 	private long lastTimeBytes = 0; 
 	private long totalBytes;
 	private long startTime; 
+	
+	/**
+	 * 保存所有下载线程的异常信息，根据size判断下载过程中是否出现了异常
+	 */
+	private Set<String> exceptionInfoSet = new HashSet<String>(); 
 	
 	public ProgressTask(Downloader downloader, long totalBytes, long startTime) {
 		this.downloader = downloader;
@@ -34,10 +41,13 @@ public class ProgressTask extends Thread {
 				if (!task.isFinished()) {
 					finished = false;
 				}
+				if (task.getExceptionInfo() != null) {
+					exceptionInfoSet.add(task.getExceptionInfo());
+				}
 				currentBytes += task.getDownloadedBytes();
-				System.out.println("线程【" + task.getTaskId() + "】已下载 : " + Utils.formatByte(task.getDownloadedBytes()));
+				//task.println("已下载 : " + Utils.formatByte(task.getDownloadedBytes()));
 			}
-			System.out.println("=====================================");
+			//System.out.println("=====================================");
 			int progress = (int) (currentBytes * 100 / totalBytes);
 			long speed = (currentBytes - lastTimeBytes);
 			
@@ -57,6 +67,16 @@ public class ProgressTask extends Thread {
 			progressInfo.setProgress(progress);
 			progressInfo.setSpeed(speed);
 			this.downloader.getListener().onProgress(progressInfo);
+			
+			// 如果下载出现了异常
+			if (exceptionInfoSet.size() > 0) {
+				StringBuilder sb = new StringBuilder();
+				for (String exInfo : exceptionInfoSet) {
+					sb.append(exInfo).append("; ");
+				}
+				downloader.exception(new Exception(sb.toString()));
+				break;
+			}
 			
 			// 如果下载完成，退出循环
 			if (finished) {

@@ -1,5 +1,7 @@
 package util;
 
+import java.io.Closeable;
+
 public class Utils {
 	public static String getFileName(String path) {
 		if (path == null || path.length() == 0) {
@@ -39,5 +41,15 @@ public class Utils {
 			}
 		}
 		return result;
+	}
+	
+	public static void closeQuietly(Closeable obj) {
+		if (obj == null) return;
+		try {
+			obj.close();
+		} catch (Exception e) {
+			//ignore exception
+			System.out.println("关闭资源时出现异常，将忽略！异常信息：" + e.getMessage());
+		}
 	}
 }

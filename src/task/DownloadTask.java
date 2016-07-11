@@ -21,9 +21,16 @@ public class DownloadTask extends Thread {
 	private long startByte;
 	private long endByte;
 	private File saveFile;
-	private long downloadedBytes;
 	private Downloader downloader;
-	private boolean finished = false;
+	
+	private long downloadedBytes; //记录本线程下载的全部字节数
+	private boolean finished = false; //是否正常执行完的标记
+	
+	/**
+	 * 记录异常退出时的异常信息，如果为null表示没有异常退出；
+	 * 否则，表示异常退出，ProgressTask线程将据此判断下载是否出错
+	 */
+	private String exceptionInfo = null; 
 	
 	/**
 	 * 实例化下载任务线程类
@@ -46,37 +53,54 @@ public class DownloadTask extends Thread {
 	
 	@Override
 	public void run() {
+		RandomAccessFile accessFile = null;
 		try {
-			RandomAccessFile accessFile = new RandomAccessFile(saveFile, "rw");
+			accessFile = new RandomAccessFile(saveFile, "rwd");
 			accessFile.seek(startByte);
 			HttpURLConnection con = (HttpURLConnection) url.openConnection();
 			con.setConnectTimeout(5000);
 			con.setReadTimeout(10000);
 			con.setRequestMethod("GET");
-			System.out.println("线程【" + taskId + "】下载起始位置：" 
-					+ startByte +" - " + endByte);
+			println("下载起始位置：" + startByte +" - " + endByte);
 			//多线程下载的关键
 			con.setRequestProperty("Range", "bytes=" + startByte + "-" + endByte);
-			if (con.getResponseCode() == 206) {
+			int responseCode = con.getResponseCode();
+			if (responseCode == 206) { // 200表示请求全部成功，206表示请求分段数据成功
 				InputStream inStream = con.getInputStream();
 				byte[] buffer = new byte[8192];
 				int len = 0;
+				boolean hasRead = false;
+				boolean hasWrite = false;
 				while((len = inStream.read(buffer)) != -1 && (!downloader.isCanceled())){
+					if (!hasRead) {
+						println("读到了数据");
+						hasRead = true;
+					}
+					//TODO 当文件很大时，只有第一个线程能写数据，其他线程在这里读到数据后，写入不了
 					accessFile.write(buffer, 0, len);
+					if (!hasWrite) {
+						println("写入了数据");
+						hasWrite = true;
+					}
 					downloadedBytes += len;
 				}
-				accessFile.close();
-				inStream.close();
+				Utils.closeQuietly(inStream);
+			} else {
+				exceptionInfo = "返回码不是206";
+				println(exceptionInfo);
+				return;
 			}
 		} catch (Exception e) {
-			downloader.exception(e); //通知下载器结束全部下载线程
-			e.printStackTrace();
+			exceptionInfo = e.getMessage();
+			println("出现异常：" + exceptionInfo);
+			return;
+		} finally {
+			Utils.closeQuietly(accessFile);
 		}
 		if(downloader.isCanceled())
-			System.out.println("线程【" + taskId + "】已取消");
+			println("已取消");
 		else {
-			System.out.println("线程【" + taskId + "】下载完毕，共下载：" 
-					+ Utils.formatByte(downloadedBytes));
+			println("下载完毕，共下载：" + Utils.formatByte(downloadedBytes));
 			finished = true;
 		}
 		
@@ -101,5 +125,13 @@ public class DownloadTask extends Thread {
 	
 	public int getTaskId() {
 		return taskId;
+	}
+	
+	public void println(String msg) {
+		System.out.println("线程【" + taskId + "】：" + msg);
+	}
+	
+	public String getExceptionInfo() {
+		return exceptionInfo;
 	}
 }
